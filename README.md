@@ -1,1 +1,101 @@
 # AQUA-LIFI-1
+
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+#define SENSOR_PIN 2
+#define UNIT_TIME 120   // adjust to match your app's dot duration
+
+String morseChar = "";
+String decodedMessage = "";
+unsigned long lastChange = 0;
+int lastState = LOW;
+
+LiquidCrystal_I2C lcd(0x27, 16, 2); // try 0x27 or 0x3F
+
+void setup() {
+  pinMode(SENSOR_PIN, INPUT);
+  Serial.begin(9600);
+
+  lcd.init();
+  lcd.backlight();
+  lcd.setCursor(0, 0);
+  lcd.print("ITU Morse Ready");
+}
+
+void loop() {
+  int state = digitalRead(SENSOR_PIN);
+  unsigned long now = millis();
+
+  if (state != lastState) {
+    unsigned long duration = now - lastChange;
+    lastChange = now;
+
+    if (state == LOW && lastState == HIGH) {
+      // Torch just turned OFF → measure ON duration
+      if (duration < UNIT_TIME * 2) {
+        morseChar += ".";
+        Serial.println("DOT");
+      } else {
+        morseChar += "-";
+        Serial.println("DASH");
+      }
+    }
+
+    if (state == HIGH && lastState == LOW) {
+      // Torch just turned ON → measure OFF duration
+      if (duration >= UNIT_TIME * 3 && morseChar.length() > 0) {
+        char decoded = decodeMorse(morseChar);
+        decodedMessage += decoded;   // add to buffer
+        Serial.print("Decoded Letter: ");
+        Serial.println(decoded);
+
+        // Show full message on LCD
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Message:");
+        lcd.setCursor(0, 1);
+        lcd.print(decodedMessage);
+
+        morseChar = "";
+      }
+      if (duration >= UNIT_TIME * 7) {
+        decodedMessage += " ";   // word space
+        Serial.println("Word Gap");
+      }
+    }
+  }
+
+  lastState = state;
+}
+
+// ITU Morse Decoder (A–Z only)
+char decodeMorse(String code) {
+  if (code == ".-") return 'A';
+  if (code == "-...") return 'B';
+  if (code == "-.-.") return 'C';
+  if (code == "-..") return 'D';
+  if (code == ".") return 'E';
+  if (code == "..-.") return 'F';
+  if (code == "--.") return 'G';
+  if (code == "....") return 'H';
+  if (code == "..") return 'I';
+  if (code == ".---") return 'J';
+  if (code == "-.-") return 'K';
+  if (code == ".-..") return 'L';
+  if (code == "--") return 'M';
+  if (code == "-.") return 'N';
+  if (code == "---") return 'O';
+  if (code == ".--.") return 'P';
+  if (code == "--.-") return 'Q';
+  if (code == ".-.") return 'R';
+  if (code == "...") return 'S';
+  if (code == "-") return 'T';
+  if (code == "..-") return 'U';
+  if (code == "...-") return 'V';
+  if (code == ".--") return 'W';
+  if (code == "-..-") return 'X';
+  if (code == "-.--") return 'Y';
+  if (code == "--..") return 'Z';
+  return '?';
+}
